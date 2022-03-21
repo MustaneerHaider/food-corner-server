@@ -19,3 +19,11 @@ export interface ProductItem {
 	description: string;
 	quantity?: number;
 }
+
+export interface OrderItem {
+	_id?: string;
+	products: { product: ProductItem; quantity: number }[];
+	userId?: string;
+	createdAt: string;
+	totalAmount: number;
+}

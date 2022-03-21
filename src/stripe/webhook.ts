@@ -4,7 +4,16 @@ import User from '../models/user';
 import Order from '../models/order';
 import { ProductItem } from '../lib/model';
 
-const fulFillOrder = async (session: any) => {
+// stripe session
+type Session = {
+	metadata: {
+		userId: string;
+	};
+	id: string;
+	amount_total: number;
+};
+
+const fulFillOrder = async (session: Session) => {
 	const user = await User.findById(session.metadata.userId).populate(
 		'cart.items.productId'
 	);

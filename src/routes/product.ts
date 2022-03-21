@@ -22,6 +22,7 @@ router.put(
 	productController.decrementItemQuantity
 );
 router.get('/orders', isAuth, productController.getOrders);
+router.get('/invoice/:orderId', isAuth, productController.getInvoice);
 router.get('/:id', isAuth, productController.getProduct);
 
 export default router;

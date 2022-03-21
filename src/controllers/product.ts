@@ -1,6 +1,8 @@
 import { RequestHandler } from 'express';
-import { ProductItem, ValidationError } from '../lib/model';
+import path from 'path';
+import PDFDocument from 'pdfkit';
 
+import { OrderItem, ProductItem, ValidationError } from '../lib/model';
 import Product from '../models/product';
 import User from '../models/user';
 import Order from '../models/order';
@@ -76,6 +78,7 @@ export const getCart: RequestHandler = async (req, res, next) => {
 		const user = await User.findById(req.userId).populate(
 			'cart.items.productId'
 		);
+		console.log(user);
 		const cartItems = user.cart.items;
 		res.status(200).json({ items: cartItems });
 	} catch (err: any) {
@@ -141,6 +144,12 @@ export const getProduct: RequestHandler<{ id: string }> = async (
 		const product = await Product.findById(req.params.id).populate(
 			'reviews.reviewId'
 		);
+
+		if (!product) {
+			const error = new ValidationError('Product not found!', 404);
+			throw error;
+		}
+
 		res.status(200).json({ prod: product });
 	} catch (err: any) {
 		err.statusCode = 500;
@@ -166,6 +175,53 @@ export const postReview: RequestHandler<{ prodId: string }> = async (
 		res.status(200).json({ message: 'Review added.' });
 	} catch (err: any) {
 		err.statusCode = 500;
+		next(err);
+	}
+};
+
+export const getInvoice: RequestHandler<{ orderId: string }> = async (
+	req,
+	res,
+	next
+) => {
+	const orderId = req.params.orderId;
+	let order: OrderItem | null;
+	try {
+		order = await Order.findById(orderId);
+
+		if (!order) {
+			const error = new ValidationError('Order not found!', 404);
+			throw error;
+		}
+
+		if (order.userId?.toString() !== req.userId) {
+			const error = new ValidationError('Unauthorized!', 401);
+			throw error;
+		}
+
+		const invoiceName = `invoice-${orderId}.pdf`;
+
+		const pdfDoc = new PDFDocument();
+		// set headers for file
+		res.setHeader('Content-Type', 'application/pdf');
+		res.setHeader(
+			'Content-Disposition',
+			`attachment; fileName="${invoiceName}"`
+		);
+		// pipe the output to response
+		pdfDoc.pipe(res);
+		// content of generated pdf
+		pdfDoc.fontSize(20).text('INVOICE\n', 20, 15, {
+			underline: true
+		});
+		order.products.forEach(({ product: { title, price }, quantity }) => {
+			pdfDoc.fontSize(13).text(`${title} - ${quantity} x Rs. ${price}\n`);
+		});
+		pdfDoc.text('----------------------------------');
+		pdfDoc.fontSize(16).text(`Total Amount: Rs. ${order.totalAmount}`);
+		// call end to send response
+		pdfDoc.end();
+	} catch (err) {
 		next(err);
 	}
 };
