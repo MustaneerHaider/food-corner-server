@@ -4,40 +4,6 @@ import User from '../models/user';
 import Order from '../models/order';
 import { ProductItem } from '../lib/model';
 
-// stripe session
-type Session = {
-	metadata: {
-		userId: string;
-	};
-	id: string;
-	amount_total: number;
-};
-
-const fulFillOrder = async (session: Session) => {
-	const user = await User.findById(session.metadata.userId).populate(
-		'cart.items.productId'
-	);
-	const products = user.cart.items.map(
-		(item: { productId: ProductItem; quantity: number }) => ({
-			product: {
-				title: item.productId.title,
-				image: item.productId.image,
-				price: item.productId.price,
-				description: item.productId.description,
-				quantity: item.productId.quantity
-			},
-			quantity: item.quantity
-		})
-	);
-
-	await Order.create({
-		products,
-		userId: session.metadata.userId,
-		totalAmount: session.amount_total / 100
-	});
-	await user.clearCart();
-};
-
 const webhook = async (req: any, res: Response) => {
 	const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 		apiVersion: '2020-08-27'
@@ -55,18 +21,38 @@ const webhook = async (req: any, res: Response) => {
 		return res.status(400).send(`Webhook error: ${(err as Error).message}`);
 	}
 
+	// Return 200 response to Stripe
+	res.send();
+
 	// handle checkout session completed event
 	if (event.type === 'checkout.session.completed') {
 		const session = event.data.object;
 
 		// fulfill the order...
-		return fulFillOrder(session)
-			.then(() => res.status(200))
-			.catch(err => {
-				res.status(400).send(
-					`Webhook error: ${(err as Error).message}`
-				);
-			});
+		const user = await User.findById(session.metadata.userId).populate(
+			'cart.items.productId'
+		);
+		const products = user.cart.items.map(
+			(item: { productId: ProductItem; quantity: number }) => ({
+				product: {
+					title: item.productId.title,
+					image: item.productId.image,
+					price: item.productId.price,
+					description: item.productId.description,
+					quantity: item.productId.quantity
+				},
+				quantity: item.quantity
+			})
+		);
+
+		// store the order in DB
+		const order = new Order({
+			products,
+			userId: session.metadata.userId,
+			totalAmount: session.amount_total / 100
+		});
+		await order.save();
+		await user.clearCart();
 	}
 };
 

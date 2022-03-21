@@ -78,7 +78,6 @@ export const getCart: RequestHandler = async (req, res, next) => {
 		const user = await User.findById(req.userId).populate(
 			'cart.items.productId'
 		);
-		console.log(user);
 		const cartItems = user.cart.items;
 		res.status(200).json({ items: cartItems });
 	} catch (err: any) {
