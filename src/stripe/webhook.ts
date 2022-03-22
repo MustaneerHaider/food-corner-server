@@ -21,12 +21,12 @@ const webhook = async (req: any, res: Response) => {
 		return res.status(400).send(`Webhook error: ${(err as Error).message}`);
 	}
 
-	// Return 200 response to Stripe
-	res.send();
-
 	// handle checkout session completed event
 	if (event.type === 'checkout.session.completed') {
 		const session = event.data.object;
+
+		// Return a 200 response to Stripe
+		res.status(200).json({ received: true });
 
 		// fulfill the order...
 		const user = await User.findById(session.metadata.userId).populate(
